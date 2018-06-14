@@ -1,0 +1,304 @@
+---
+title: "SIB Course on Docker For Reproducible Research"
+author: "Peter von Rohr"
+date: '2018-06-13'
+output:
+  pdf_document:
+    citation_package: natbib
+  html_document: default
+bibliography: skeleton.bib
+link-citations: yes  
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Disclaimer
+
+
+# Introduction
+Docker has become popular in areas of scientific computing such as computational biology. According to my limited understanding it seams to be a light-weight version of the virtualisation concept. 
+
+
+# Course 
+
+## Introduction of Instructor
+
+* Name: Walid Gharib
+* Instructor at UniB and SIB
+
+## Reason
+
+* Using docker in courses and teaching
+* docker can ensure principles of reproducibility
+
+## Material
+All available on the website: http://training.bioinformatics.unibe.ch/Docker2018/
+
+
+## People
+* Bioinformatics ETH, Kinderspital, Lausanne
+* Climate models
+* Agroscope
+* Logistics
+
+
+## Reproducibility
+* 10 rules
+
+
+## Docker intro
+* docker must be run as a sudoer
+* singularity can be run as an ordinary user. Singularity implements docker as a "container in a container". Singularity can be used to run any docker image.
+
+
+## Installation of docker and singularity
+* On linux docker can be installed as ordinary software using `sudo apt-get ...`. There is no need to re-compile the kernel.
+* Singularity does not need a sudoer account, but can be used to run docker images.
+
+
+## What is docker
+The raw container-infrastructure works only on linux. On MacOs and on Windows docker has a hypervisor. 
+
+* How does it work: Docker-Daemon and libcontainer do not need to be on the same physical machine as the docker client. `docker-machine` gives us a way to specify the location of the two components. 
+* Registry: called docker-hub where available images can be published.
+* Dockerfile: is a text-file containing commands to build an image. When adding commands at the end of the dockerfile, just the new software is added.  
+
+
+# Practicals
+Running the commands listed on http://training.bioinformatics.unibe.ch/Docker2018/cli.html
+
+
+## Running basic docker commands
+
+* Running `docker` shows the help text
+* Running `docker search rstudio` shows the images available on docker-hub
+
+
+## Pulling an image and running it
+
+* Pulling ubuntu is done via `docker pull ubuntu` for the latest version or `docker pull ubuntu:16.04` for version 16.04
+* Running the image via `docker run --rm -t -i ubuntu:16.04 /bin/bash`, the options mean
+    + `--rm`: remove after finishing /bin/bash
+    + `-t`: use tty
+    + `-i`: run interactively
+* Showing the processes leads to
+```
+root@4ffc734ce581:/# ps -aux
+USER       PID %CPU %MEM    VSZ   RSS TTY      STAT START   TIME COMMAND
+root         1  0.0  0.1  18232  3392 pts/0    Ss   09:28   0:00 /bin/bash
+root        12  0.0  0.1  34420  2920 pts/0    R+   09:29   0:00 ps -aux
+```
+* Top inside the container and outside: Inside of docker only the inside processes are shown. From the outside, all processes are shown
+
+## Managing containers
+
+* Different commands with managing containers
+
+```
+ 505  for i in `seq 1 5`;do docker run ubuntu;done
+  506  docker run -dit ubuntu /bin/bash
+  508  docker ps -a -q
+  511  docker restart $(docker ps -a -q)
+  512  docker ps -a
+  513  docker exec -it $(docker ps -a -q) /bin/bash
+  514  docker restart $(docker ps -a -q)
+  515  docker attach $(docker ps -a -q)
+```
+
+* More details on the above commands
+```
+for i in `seq 1 5`;do docker run ubuntu;done
+```
+
+    + The above runs 5 instances of a given docker image. This can be seen from the output of 
+    
+```
+YARLI:apache-share peter$ docker ps -a
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS                      PORTS               NAMES
+6671837f6489        ubuntu              "/bin/bash"         7 seconds ago       Exited (0) 6 seconds ago                        confident_knuth
+ba1840a866ac        ubuntu              "/bin/bash"         9 seconds ago       Exited (0) 7 seconds ago                        peaceful_turing
+581a2a0f3c3f        ubuntu              "/bin/bash"         10 seconds ago      Exited (0) 9 seconds ago                        confident_cori
+a584dbc57f77        ubuntu              "/bin/bash"         11 seconds ago      Exited (0) 10 seconds ago                       determined_meninsky
+809a449954c9        ubuntu              "/bin/bash"         14 seconds ago      Exited (0) 11 seconds ago                       zealous_euler
+```
+
+    + Starting another container
+``` 
+docker run -dit ubuntu /bin/bash
+```
+
+* Installation of samtools
+
+```
+apt-get update && \
+apt-get install -y wget bzip2 gcc make zlib1g-dev libncurses5-dev libncursesw5-dev libbz2-dev liblzma-dev && \
+apt-get clean &&
+wget https://github.com/samtools/samtools/releases/download/1.5/samtools-1.5.tar.bz2 && \
+tar -xjvf samtools-1.5.tar.bz2 && \
+cd samtools-1.5 && \
+make && \
+ln -s /samtools-1.5/samtools /usr/bin/samtools && \
+cd &&
+samtools
+```
+
+* Commit changes to the image
+
+```
+docker commit $(docker ps -a -q) ubuntu:just-samtools
+docker rm $(docker ps -a -q)
+docker run -it ubuntu:just-samtools /bin/bash
+```
+
+$\rightarrow$ This brings back the container with samtools installed.
+
+* Exercise with BAM file
+
+```
+#Download to $HOME dir
+DOCKERHOME=$HOME/dockerhome
+if [ ! -d "$DOCKERHOME" ];then mkdir -p $DOCKERHOME;fi
+
+# download data
+cd $DOCKERHOME
+wget https://campuscloud.unibe.ch:443/ssf/s/readFile/share/22450/7876265840195647501/publicLink/NA12878_rnaseq_20.bam -O NA12878_rnaseq_20.bam
+
+# running docker with mount from FS
+docker run -v $DOCKERHOME:/home  ubuntu:just-samtools samtools view -h -o /home/NA12878_rnaseq_20.sam /home/NA12878_rnaseq_20.bam
+
+# alternative path
+docker run  -it ubuntu:just-samtools samtools view -h -o /data/NA12878_rnaseq_20.sam /data/NA12878_rnaseq_20.bam
+
+```
+
+* Exercise with RStudio
+```
+SHAREDWITHRSTUDIO=$HOME/shared-with-rstudio
+if [ ! -d "$SHAREDWITHRSTUDIO" ];then mkdir -p $SHAREDWITHRSTUDIO;fi
+docker run -d -p 8000:8787 -v $SHAREDWITHRSTUDIO:/home/rstudio rocker/rstudio
+```
+
+## Building own images from Dockerfile
+The following information is put into a dockerfile
+
+```
+ARLI:dockerimages peter$ cat Dockerfile
+FROM ubuntu:16.04
+MAINTAINER Peter von Rohr (peter.vonrohr@qualitasag.ch)
+```
+
+From the dockerfile, the image is created
+
+```
+YARLI:dockerimages peter$ docker build -t pvrqualitasag/test:v0.0.900 .
+Sending build context to Docker daemon  2.048kB
+Step 1/2 : FROM ubuntu:16.04
+ ---> 5e8b97a2a082
+Step 2/2 : MAINTAINER Peter von Rohr (peter.vonrohr@qualitasag.ch)
+ ---> Running in 1660440755a9
+Removing intermediate container 1660440755a9
+ ---> 6274eed1b3d8
+Successfully built 6274eed1b3d8
+Successfully tagged pvrqualitasag/test:v0.0.900
+```
+
+Running the build command again says that it uses the cache
+
+```
+ARLI:dockerimages peter$ docker build -t pvrqualitasag/test:v0.0.900 .
+Sending build context to Docker daemon  2.048kB
+Step 1/2 : FROM ubuntu:16.04
+ ---> 5e8b97a2a082
+Step 2/2 : MAINTAINER Peter von Rohr (peter.vonrohr@qualitasag.ch)
+ ---> Using cache
+ ---> 6274eed1b3d8
+Successfully built 6274eed1b3d8
+Successfully tagged pvrqualitasag/test:v0.0.900
+```
+
+Adding commands after the `RUN` keyword to the dockerfiles downloads and installs the software indicated while creating the image.
+
+* Full version of Dockerfile
+
+```
+# build
+docker build -t pvrqualitasag/test .
+
+# share a directory for apache
+APACHESHARE=$HOME/apache-share
+if [ ! -d "$APACHESHARE" ];then mkdir -p $APACHESHARE;fi
+docker run -dit -p 8000:80 -v  $APACHESHARE:/share pvrqualitasag/test
+```
+
+Adding external scripts into the dockerfile
+
+```
+## share with apache
+ADD run.sh $BUILD
+```
+
+Building and running 
+
+```
+docker build -t pvrqualitasag/test .
+docker run -it --rm -p 8000:80 -v  $APACHESHARE:/share pvrqualitasag/test /bin/bash
+```
+
+
+
+# Additional commands
+
+
+```
+## remove intermediate <none> tagged images
+docker rmi $(docker images | grep -a  "^<none>" | awk '{print $3}')
+```
+
+
+* Command to stop and remove a container
+
+```
+# in a single command stop and remove all running containers (use -a -q flags)
+docker stop $(docker ps -a -q) && docker rm $(docker ps -a -q)
+```
+
+* Saving images to a file: use `docker save <img>` 
+
+* Reloding docker image from a file: use `docker laod < img.file.tar.gz` or with `docker load --input img.file.tar.gz`
+
+
+# Further Resources
+Martin Berner has shared the following article by @thehftguy2016 on LinkedIn. The original article was very critical and did not recommend to use docker for anything that needs to be stable and that should adhere to any production quality measures. In 2017 the same author gave an update on his first post. On the website of TheHFTGuy there is a link to the book by @MS2016. 
+
+
+
+```{r bib, include=FALSE}
+vec_bref <- c(
+  bibentry(
+    bibtype = "Unpublished",
+    title   = "Docker in Production: A History of Failure – The HFT Guy",
+    author  = "The HFT Guy",
+    year    = "2016",
+    note    = "Blog post on docker",
+    key     = "thehftguy2016"),
+  bibentry(
+    bibtype = "Book",
+    title   = "Docker in Practice",
+    author  = c(as.person("I. Miell"), as.person("A. Hobson Sayers")),
+    year    = "2016",
+    publisher = "Manning",
+    key       = "MS2016"
+  )
+)
+# create a bib file
+rmddochelper::write_bib(pvec_bref = vec_bref)
+```
+
+```{r ReferencesTitle, echo=FALSE, results='asis'}
+# in case of html_output write the title for the references section
+if (knitr::is_html_output())
+  cat("\n\n# References\n")
+```
+
