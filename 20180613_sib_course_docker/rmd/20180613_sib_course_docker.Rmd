@@ -3,9 +3,9 @@ title: "SIB Course on Docker For Reproducible Research"
 author: "Peter von Rohr"
 date: '2018-06-13'
 output:
+  html_document: default
   pdf_document:
     citation_package: natbib
-  html_document: default
 bibliography: skeleton.bib
 link-citations: yes  
 ---
